@@ -7,7 +7,7 @@ Amplify Data helps its customers distribute their data to external stakeholders.
 Your goal is to write a program that transfers data between a Snowflake database owned by the customer and an S3 bucket owned by their stakeholder. When transferring the data, please apply the following transformations to the source data:
 
 - Remove any fully blank rows
-- If there is a date column in the data, aggregate the full dataset to be monthly.  For all non-numeric columns, leave those unaggregated, and you can SUM all numeric columns.
+- The customer wants to consume data at a monthly level of aggregation, so you should send an aggregated dataset using the existing columns. For all non-numeric columns, leave unaggregated, for numeric columns, use SUM aggregation.
 
 ### Outputs
 
