@@ -71,18 +71,28 @@ class SnowflakeService:
 ##########################################################################
 
     def get_single_response_from_query(self, query: str) -> Any:
-        """returns first returned value from first row of query"""
+        """
+        returns first returned value from first row of query
+        TODO: perhaps change to try except to handle blank rows
+        """
         results = self.get_first_row_from_query(query)
         if results is None:
             return None
         return results[0]
 
-    def get_first_row_from_query(self, query: str) -> Row | None:
-        """return first row from a query"""
+    def get_first_row_from_query(self, query: str) -> Row:
+        """
+        return first row from a query
+        DONE: changed to try except to get working
+        """
         results = self.execute_query(query)
-        if results is None:
-            return None
-        return results.fetchone()
+        # if results is None:
+        #     return None
+        bypass_exception = "Does Not Exist, thus bypassing: "
+        try:
+            return results.fetchone()
+        except Exception as e:
+            print(bypass_exception, str(e))
 
     def execute_query(self, query: str) -> CursorResult:
         """
