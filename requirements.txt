@@ -27,3 +27,8 @@ typing_extensions==4.6.3
 urllib3==1.26.16
 pyproject-toml
 boto3
+pandas-stubs
+mypy
+types-jmespath
+types-boto3
+types-sqlalchemy

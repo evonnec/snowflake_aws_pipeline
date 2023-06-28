@@ -80,20 +80,15 @@ class SnowflakeService:
             return None
         return results[0]
 
-    def get_first_row_from_query(self, query: str) -> Row:
+    def get_first_row_from_query(self, query: str) -> Row | None:
         """
         return first row from a query
-        DONE: changed to try except to get working
         """
         results = self.execute_query(query)
-        # if results is None:
-        #     return None
-        bypass_exception = "Does Not Exist, thus bypassing: "
-        try:
-            return results.fetchone()
-        except Exception as e:
-            print(bypass_exception, str(e))
-
+        if results is None:
+            return None
+        return results.fetchone()
+        
     def execute_query(self, query: str) -> CursorResult:
         """
         runs query, returning results

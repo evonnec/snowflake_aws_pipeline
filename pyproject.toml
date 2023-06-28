@@ -31,5 +31,16 @@ dependencies = [
     "urllib3==1.26.16",
     "pyproject-toml",
     "boto3",
+    "mypy",
+    "pandas-stubs",
+    "types-jmespath",
+    "types-sqlalchemy",
 ]
 version = "0.1"
+
+[tool.mypy]
+
+[[tool.mypy.overrides]]
+
+module = ["snowflake.sqlalchemy", "snowflake.connector", "snowflake.connector.options", "pyarrow", "pyarrow.parquet"]
+ignore_missing_imports = true
