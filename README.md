@@ -62,7 +62,10 @@ Our processing server has 1GB RAM.
 2. Explain how to run your program   
     2. For each of the tables, we ought to pass in the date column in which to group by month, and the column to sum.  
     We could potentially have pulled out the schemas of the tables for datetime col's and int/float/etc col's in order to do the group by and sum, but some tables had more than one col.  
-    Specifying explicitly, we know what we have.  
+    For example, `ORDERS_100K` had `O_ORDERKEY` and `O_CUSTOMERKEY` and `O_SHIPPRIORITY` as float types in addition to `O_TOTALPRICE`. Additionally, there were two timestamps with `CREATED_AT` and `O_ORDERDATE` to group by month.
+    Specifying explicitly, we group by a specific column instead of guessing which column we want to do the grouping by. Since it doesn't really make sense to sum by order key or customer key or shipping priority, we decide what column we want to sum by monthly aggregation which is total price.
+    Perhaps we do want to handle multiple sums given a specific group column. In which case, we can take inventory of all the float columns by checking the schemas and returning the columns whose type can be summed by month and then rearchitect. 
+    For simplicity, we specify the exact columns in this example code.  
   ```python3 main.py --table_name 'LOCATIONS_595' --sum_column 'AREA_KM2' --group_column 'DOB'```  
   ```python3 main.py --table_name 'ORDERS_100K' --sum_column 'O_TOTALPRICE' --group_column 'O_ORDERDATE'```  
   ```python3 main.py --table_name 'MOVIE_RATINGS_27M' --sum_column 'RATING' --group_column 'TIMESTAMP'```  
@@ -71,7 +74,7 @@ Our processing server has 1GB RAM.
     - file formats that would work are .parquet or .json  
     - we chose .json for now, and specify the `orient` parameter to give an orientation to determine how we'd like to see the output.  
     for now, we've used `records` so we can pretty print the results
-    for example, to view use `cat LOCATIONS_595_20230629-112117.json | json_pp`
+    for example, to view use `cat LOCATIONS_595_<uuid>_<timestamp>.json | json_pp`
 3. Any other comments you would like to include  
     - we pull from the database twice to do the transform. ideally this would be one pull per time the program runs. and give it the filter before it returns all the results.  
     - pull the secrets using secrets manager or similar, not have them in the code.  
@@ -102,7 +105,6 @@ We'll discuss the following questions (plus any other relevant follow-ups):
 5. What was the most difficult part of this problem? If you were running this assessment, what would you change?
     - getting used to libraries I haven't worked with that much. If I were running this assessment, I'd perhaps make the transform more clear as to exact expected output with a sample input example so it's clear what's expected. I would also maybe ask for different data type outputs to be handled and provide them based on what a client expects. also provide any specifics with respect to filename.
 
-create document here
 ## Evaluation
 
 You will be evaluated based on the following criteria:
