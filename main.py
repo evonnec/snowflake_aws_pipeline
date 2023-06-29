@@ -93,7 +93,8 @@ def final_snowflake_df_read_and_filter(
 
 def transfer_data(
     table_name: str, 
-    transformed_data: pd.DataFrame
+    storage_bucket: str,
+    data: pd.DataFrame
     ) -> dict:
     """Takes result of transformed source data
     create_file_from_data(transformed_data) and create file
@@ -113,17 +114,17 @@ def transfer_data(
     
     random_name = uuid.uuid4().hex
     file_path = f"{table_name}_{random_name}"
-    body = create_file_from_data(transformed_source_data=transformed_data)
+    body = create_file_from_data(transformed_source_data=data)
     timestamp = time.strftime("%Y%m%d-%H%M%S")
     filename = f"{file_path}_{timestamp}.json"
     
     s3.meta.client.put_object(
         Body=body,
         Key=filename, 
-        Bucket=args.bucket_name, 
+        Bucket=storage_bucket, 
         ContentType='application/json'
     )
-    row_count = len(transformed_data)
+    row_count = len(data)
     results = {
         "file_name": filename,
         "row_count": row_count,
@@ -158,5 +159,8 @@ if __name__ == '__main__':
         group_col=f"{args.group_column}", 
         sum_col=f"{args.sum_column}"
     )
-
-    transfer_data(table_name=args.table_name, transformed_data=result)
+    tablename = args.table_name
+    bucketname = args.bucket_name
+    print(f"TRANSFERRING PANDAS DATAFRAME FROM {args.table_name} TO S3\n")
+    transfer_data(table_name=tablename, data=result, storage_bucket=bucketname)
+    print("PROCESSING COMPLETED")
