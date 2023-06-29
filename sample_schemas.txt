@@ -1,0 +1,53 @@
+
+LOCATIONS_595 = [
+    ('WCR_NAME', 'VARCHAR(16777216)', 'COLUMN', 'Y', None, 'N', 'N', None, None, None, None), 
+    ('DOB', 'TIMESTAMP_NTZ(9)', 'COLUMN', 'Y', None, 'N', 'N', None, None, None, None), 
+    ('LONGITUDE', 'VARCHAR(16777216)', 'COLUMN', 'Y', None, 'N', 'N', None, None, None, None), 
+    ('LATITUDE', 'VARCHAR(16777216)', 'COLUMN', 'Y', None, 'N', 'N', None, None, None, None), 
+    ('AREA_KM2', 'FLOAT', 'COLUMN', 'Y', None, 'N', 'N', None, None, None, None) # sum this col
+]
+
+LOCATIONS_595_EXAMPLE = [
+    ('WE20000306H', datetime.datetime(2000, 3, 6, 0, 0), '-64.12', '40.43', 7124.88),
+    ('WE20000313J', datetime.datetime(2000, 3, 13, 0, 0), '-66.04', '40.92', 8774.54),
+    ('WE20000410K', datetime.datetime(2000, 4, 10, 0, 0), '-56.69', '42.72', 7521.35),
+    ('WE20000417L', datetime.datetime(2000, 4, 17, 0, 0), '-58', '40.48', 51917.66),
+    ('WE20000510M', datetime.datetime(2000, 5, 10, 0, 0), '-61.02', '40.53', 48685.12),
+]
+
+ORDERS_100K = [
+    ('O_ORDERKEY', 'FLOAT', 'COLUMN', 'Y', None, 'N', 'N', None, None, None, None), 
+    ('O_CUSTKEY', 'FLOAT', 'COLUMN', 'Y', None, 'N', 'N', None, None, None, None), 
+    ('O_ORDERSTATUS', 'VARCHAR(16777216)', 'COLUMN', 'Y', None, 'N', 'N', None, None, None, None), 
+    ('O_TOTALPRICE', 'FLOAT', 'COLUMN', 'Y', None, 'N', 'N', None, None, None, None), 
+    ('O_ORDERDATE', 'TIMESTAMP_NTZ(9)', 'COLUMN', 'Y', None, 'N', 'N', None, None, None, None), 
+    ('O_ORDERPRIORITY', 'VARCHAR(16777216)', 'COLUMN', 'Y', None, 'N', 'N', None, None, None, None), 
+    ('O_CLERK', 'VARCHAR(16777216)', 'COLUMN', 'Y', None, 'N', 'N', None, None, None, None), 
+    ('O_SHIPPRIORITY', 'FLOAT', 'COLUMN', 'Y', None, 'N', 'N', None, None, None, None), 
+    ('O_COMMENT', 'VARCHAR(16777216)', 'COLUMN', 'Y', None, 'N', 'N', None, None, None, None), 
+    ('CREATED_AT', 'TIMESTAMP_NTZ(9)', 'COLUMN', 'Y', None, 'N', 'N', None, None, None, None)
+]
+
+ORDERS_100K_EXAMPLE = [
+    (4200034.0, 147128.0, 'O', 131709.3, datetime.datetime(1998, 6, 24, 0, 0), '3-MEDIUM', 'Clerk#000000825', 0.0, 'nag fluffily ironic, pendi', datetime.datetime(2022, 6, 29, 18, 37, 56, 448000)),
+    (4200099.0, 29578.0, 'O', 97624.33, datetime.datetime(1998, 2, 28, 0, 0), '1-URGENT', 'Clerk#000000578', 0.0, 'carefully across the regularly special deposits.', datetime.datetime(2020, 10, 14, 18, 37, 56, 448000)),
+    (4200165.0, 59929.0, 'O', 110210.84, datetime.datetime(1998, 6, 6, 0, 0), '2-HIGH', 'Clerk#000000292', 0.0, '. quickly unusual accounts agains', datetime.datetime(2020, 11, 7, 19, 37, 56, 448000)),
+    (4200258.0, 82702.0, 'O', 197466.08, datetime.datetime(1998, 6, 23, 0, 0), '4-NOT SPECIFIED', 'Clerk#000000823', 0.0, 'ular requests-- foxes haggle slyl', datetime.datetime(2022, 10, 2, 18, 37, 56, 448000)),
+    (4200323.0, 137288.0, 'O', 168862.45, datetime.datetime(1998, 7, 28, 0, 0), '2-HIGH', 'Clerk#000000971', 0.0, 'lyly according to the bold deposits. quickly bold re', datetime.datetime(2022, 9, 8, 18, 37, 56, 448000)),
+]
+
+MOVIE_RATINGS_27M = 
+[
+    ('USERID', 'VARCHAR(16777216)', 'COLUMN', 'Y', None, 'N', 'N', None, None, None, None), 
+    ('MOVIEID', 'VARCHAR(16777216)', 'COLUMN', 'Y', None, 'N', 'N', None, None, None, None), 
+    ('RATING', 'FLOAT', 'COLUMN', 'Y', None, 'N', 'N', None, None, None, None), 
+    ('TIMESTAMP', 'TIMESTAMP_NTZ(9)', 'COLUMN', 'Y', None, 'N', 'N', None, None, None, None)
+]
+
+MOVIE_RATINGS_27M_EXAMPLE = [
+    ('267668', '1912', 5.0, datetime.datetime(2008, 10, 12, 17, 7, 13)),
+    ('267668', '1917', 3.0, datetime.datetime(2007, 11, 4, 2, 1, 22)),
+    ('267668', '1921', 4.0, datetime.datetime(2008, 10, 12, 17, 4, 31)),
+    ('267668', '1923', 4.0, datetime.datetime(2007, 11, 4, 1, 59, 59)),
+    ('267668', '1959', 4.5, datetime.datetime(2007, 11, 1, 16, 1)),
+]

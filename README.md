@@ -75,6 +75,9 @@ Our processing server has 1GB RAM.
     - we chose .json for now, and specify the `orient` parameter to give an orientation to determine how we'd like to see the output.  
     for now, we've used `records` so we can pretty print the results
     for example, to view use `cat LOCATIONS_595_<uuid>_<timestamp>.json | json_pp`
+    - additionally we choose bytes to pass to s3. At this time, we don't know if it is slower because we are reading in bytes.
+    Alternatively we could do a `with open(file):` and `s3.put_object` while the file is open as the documentation says that is acceptable as well:
+    https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3/client/put_object.html
 3. Any other comments you would like to include  
     - we pull from the database twice to do the transform. ideally this would be one pull per time the program runs. and give it the filter before it returns all the results.  
     - pull the secrets using secrets manager or similar, not have them in the code.  
@@ -89,21 +92,24 @@ We'll discuss the following questions (plus any other relevant follow-ups):
 
 1. Provide a brief explanation of your architecture and any external libraries used. Would you architect it differently if you had more time?
     - brief architecture is that the program takes in a table, and a group by column (i.e. datetime) and a sum column (i.e. some numeric field) and sums the numeric field grouped by the month and year.
-    - it transforms it as required (no fully null rows), and pushes the result in the form of a dataframe.
-    - we use pandas dataframe for this example
-    - holding in memory can be expensive as is writing to disk. we can make additional considerations if the data is too much for the resources it has and take a look at numpy or Spark.
-    - If I had more time, I'd probably clean it up more, further modularize the code, add tests for each item, and handle exceptions clearly.
+    - it transforms it as required (no fully null rows), working with pandas dataframes.
+    - It then writes that to JSON in memory.
+    - holding in memory can be expensive as is writing to disk. we can make additional considerations if the data is too much for the resources it has and take a look at numpy or Spark or something else.
+    - It then uses boto3 python library to upload to S3.
+    - If I had more time, I'd probably clean it up more, further modularize the code, add tests for each item, and handle exceptions clearly. I would separate the CLI logic from the business logic.
 2. If you had to handle file sizes larger than 1GB, how would you change your program (if at all)? Larger than 1TB?
-    - Yes, as I stated before, we might have to move away from a dataframe and move to a native data structure in python object instead.
     - For larger than 1 TB, we can't hold the entire dataset in memory. To work around that, we may want to pull data by month and year, then we could and write them to parquet. 
     If that was unavailable to us, to pull all data by a set size and paginate, and from that large subset, put the rows into partitioned data objects by month/year, probably something like parquet, and do so again for a next batch and append to existing parquets. Once we have all the monthly data processed and properly partitioned, then do the sum/aggregate by month. And lastly, ship the results to S3, this may also have to be done in chunks. So the pipeline would have to be broken up partitions.
 3. How would you test that your program is working?
     - I would write tests in a test suite using pytest, then have CI run those tests each time code is pushed.
-    - I would also perhaps set up mocking or stubbing to have a fake version of an external or internal service or behavior that mimics that can stand in for the real one.
+    - I would also perhaps set up mocking or stubbing to have a fake version of Snowflake and S3 for unit tests. Moto exists as a mock for AWS.
+    - For integration tests, I would have instances of those services which are not customer facing.
+    - I would do manual tests (running the CLI) as well or put those into a program, test those regularly or before releases.
+    - I would add strict linting and code coverage requirements.
 4. If you had more time, what other features would you include?
     - the items I wrote above
 5. What was the most difficult part of this problem? If you were running this assessment, what would you change?
-    - getting used to libraries I haven't worked with that much. If I were running this assessment, I'd perhaps make the transform more clear as to exact expected output with a sample input example so it's clear what's expected. I would also maybe ask for different data type outputs to be handled and provide them based on what a client expects. also provide any specifics with respect to filename.
+    - getting used to libraries I haven't worked with that much. If I were running this assessment, I'd perhaps make the transform more clear as to exact expected output with a sample input example so it's clear what's expected. I would also maybe ask for different data type outputs to be handled and provide them based on what a client expects. also provide any specifics with respect to filename based on client needs.
 
 ## Evaluation
 
