@@ -80,7 +80,8 @@ def snowflake_df_read_and_filter(
     df_join = (
         df_all.merge(df_filtered, on=["MONTH", "YEAR"], how="left")
         .drop("MONTH", axis=1)
-        .drop("YEAR", axis=1)  # ).drop(sum_col, axis=1 \
+        .drop("YEAR", axis=1)  
+      # .drop(sum_col, axis=1 \
         .dropna(how="all")
     )
     ### TODO: unclear on whether to drop `sum_col` -- check
@@ -118,7 +119,7 @@ def transfer_data(table_name: str, storage_bucket: str, data: pd.DataFrame) -> d
 
     row_count = len(data)
     results = {"file_name": filename, "row_count": row_count, "timestamp": timestamp}
-    print(results)
+    logging.info('Results are "%s"', results)
     return results
 
 
@@ -141,8 +142,8 @@ def create_file_from_data(transformed_source_data: pd.DataFrame) -> bytes:
 
 
 if __name__ == "__main__":
-    print(f"READING {args.table_name} SQL TABLE INTO PANDAS DATAFRAME\n")
-    result = final_snowflake_df_read_and_filter(
+    logging.info(f"READING {args.table_name} SQL TABLE INTO PANDAS DATAFRAME\n")
+    result = snowflake_df_read_and_filter(
         table_name=f"{args.table_name}",
         group_col=f"{args.group_column}",
         sum_col=f"{args.sum_column}",
@@ -151,7 +152,7 @@ if __name__ == "__main__":
     tablename = args.table_name
     bucketname = args.bucket_name
 
-    print(f"TRANSFERRING PANDAS DATAFRAME FROM {args.table_name} TO S3\n")
+    logging.info(f"TRANSFERRING PANDAS DATAFRAME FROM {args.table_name} TO S3\n")
     transfer_data(table_name=tablename, data=result, storage_bucket=bucketname)
 
-    print("PROCESSING COMPLETED")
+    logging.info("PROCESSING COMPLETED")
