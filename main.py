@@ -6,6 +6,7 @@ import pandas as pd
 import argparse
 import logging
 import pathlib
+from typing import Dict
 
 SNOWFLAKE_CREDENTIALS = {
     "user": "candidate",
@@ -109,25 +110,29 @@ def transfer_data(
     )
     
     s3 = session.resource('s3')
-    file_path = f"{table_name}"
+    
+    random_name = uuid.uuid4().hex
+    file_path = f"{table_name}_{random_name}"
     body = create_file_from_data(transformed_source_data=transformed_data)
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
+    filename = f"{file_path}_{timestamp}.json"
+    
     s3.meta.client.put_object(
         Body=body,
-        Key=file_path, 
+        Key=filename, 
         Bucket=args.bucket_name, 
         ContentType='application/json'
     )
     row_count = len(transformed_data)
-    time_stamp = body.split(".")[0].split("_")[3]
     results = {
-        "file_name": f"{body}",
+        "file_name": filename,
         "row_count": row_count,
-        "timestamp": time_stamp
+        "timestamp": timestamp
     }
     print(results)
     return results
             
-def create_file_from_data(transformed_source_data: pd.DataFrame) -> str:
+def create_file_from_data(transformed_source_data: pd.DataFrame) -> bytes:
     """create a file from pandas DataFrame
     returns: str 
     __description: the string is the path to json file
@@ -143,8 +148,8 @@ def create_file_from_data(transformed_source_data: pd.DataFrame) -> str:
         index='true' \
     )
     logging.info('File named "%s" created', json_file)
-    contents = pathlib.Path(json_file)
-    return str(contents)
+    contents_in_bytes = pathlib.Path(json_file).read_bytes()
+    return contents_in_bytes
     
 if __name__ == '__main__':
     print(f"READING {args.table_name} SQL TABLE INTO PANDAS DATAFRAME\n")
