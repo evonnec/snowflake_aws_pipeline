@@ -70,7 +70,8 @@ Our processing server has 1GB RAM.
     - we can choose to stream io bytes or write to a file format  
     - file formats that would work are .parquet or .json  
     - we chose .json for now, and specify the `orient` parameter to give an orientation to determine how we'd like to see the output.  
-    for now, we've used `records` so we can pretty print the results  
+    for now, we've used `records` so we can pretty print the results
+    for example, to view use `cat LOCATIONS_595_20230629-112117.json | json_pp`
 3. Any other comments you would like to include  
     - we pull from the database twice to do the transform. ideally this would be one pull per time the program runs. and give it the filter before it returns all the results.  
     - pull the secrets using secrets manager or similar, not have them in the code.  
@@ -91,8 +92,11 @@ We'll discuss the following questions (plus any other relevant follow-ups):
     - If I had more time, I'd probably clean it up more, further modularize the code, add tests for each item, and handle exceptions clearly.
 2. If you had to handle file sizes larger than 1GB, how would you change your program (if at all)? Larger than 1TB?
     - Yes, as I stated before, we might have to move away from a dataframe and move to a native data structure in python object instead.
+    - For larger than 1 TB, we can't hold the entire dataset in memory. To work around that, we may want to pull data by month and year, then we could and write them to parquet. 
+    If that was unavailable to us, to pull all data by a set size and paginate, and from that large subset, put the rows into partitioned data objects by month/year, probably something like parquet, and do so again for a next batch and append to existing parquets. Once we have all the monthly data processed and properly partitioned, then do the sum/aggregate by month. And lastly, ship the results to S3, this may also have to be done in chunks. So the pipeline would have to be broken up partitions.
 3. How would you test that your program is working?
     - I would write tests in a test suite using pytest, then have CI run those tests each time code is pushed.
+    - I would also perhaps set up mocking or stubbing to have a fake version of an external or internal service or behavior that mimics that can stand in for the real one.
 4. If you had more time, what other features would you include?
     - the items I wrote above
 5. What was the most difficult part of this problem? If you were running this assessment, what would you change?
