@@ -85,7 +85,7 @@ def final_snowflake_df_read_and_filter(
             on=["MONTH", "YEAR"], how="left" \
         ).drop("MONTH", axis=1 \
         ).drop("YEAR", axis=1 \
-        ).drop(sum_col, axis=1 \
+        # ).drop(sum_col, axis=1 \
         ).dropna(how='all')
         ### TODO: unclear on whether to drop `sum_col` -- check
     print(df_join)
@@ -113,10 +113,9 @@ def transfer_data(
     s3 = session.resource('s3')
     
     random_name = uuid.uuid4().hex
-    file_path = f"{table_name}_{random_name}"
-    body = create_file_from_data(transformed_source_data=data)
     timestamp = time.strftime("%Y%m%d-%H%M%S")
-    filename = f"{file_path}_{timestamp}.json"
+    filename = f"{table_name}_{random_name}_{timestamp}.json"
+    body = create_file_from_data(transformed_source_data=data)
     
     s3.meta.client.put_object(
         Body=body,
@@ -124,6 +123,8 @@ def transfer_data(
         Bucket=storage_bucket, 
         ContentType='application/json'
     )
+    logging.info('File "%s" is transferred', filename)
+
     row_count = len(data)
     results = {
         "file_name": filename,
@@ -159,8 +160,11 @@ if __name__ == '__main__':
         group_col=f"{args.group_column}", 
         sum_col=f"{args.sum_column}"
     )
+    
     tablename = args.table_name
     bucketname = args.bucket_name
+    
     print(f"TRANSFERRING PANDAS DATAFRAME FROM {args.table_name} TO S3\n")
     transfer_data(table_name=tablename, data=result, storage_bucket=bucketname)
+    
     print("PROCESSING COMPLETED")
