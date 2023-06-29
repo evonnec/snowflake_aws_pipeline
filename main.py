@@ -74,15 +74,15 @@ def final_snowflake_df_read_and_filter(
         df_all = ss.get_df_from_query(
             f"SELECT * FROM {table_name}"
         )
-        df_all['MONTH'] = pd.DatetimeIndex(df_all[group_col]).month
-        df_all['YEAR'] = pd.DatetimeIndex(df_all[group_col]).year
         df_filtered = ss.get_df_from_query(
             f"SELECT sum({sum_col}), MONTH({group_col}) as MONTH, \
                 YEAR({group_col}) as YEAR FROM {table_name} \
                 GROUP BY MONTH({group_col}), YEAR({group_col})"
         )
-        df_join = df_all.merge(df_filtered, \
-            on=["MONTH", "YEAR"], how="left" \
+    df_all['MONTH'] = pd.DatetimeIndex(df_all[group_col]).month
+    df_all['YEAR'] = pd.DatetimeIndex(df_all[group_col]).year
+    df_join = df_all.merge(df_filtered, \
+        on=["MONTH", "YEAR"], how="left" \
         ).drop("MONTH", axis=1 \
         ).drop("YEAR", axis=1 \
         # ).drop(sum_col, axis=1 \
@@ -103,6 +103,7 @@ def transfer_data(
 
     Args:
         table_name (str): name of source table in SnowFlake db
+        storage_bucket (str): name of S3 bucket to write data file to
         transformed_data (pd.DataFrame): transformed source data as a DataFrame
     """
     session = boto3.Session(
