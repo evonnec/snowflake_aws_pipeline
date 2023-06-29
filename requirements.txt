@@ -29,6 +29,7 @@ pyproject-toml
 boto3
 pandas-stubs
 mypy
+ruff
 types-jmespath
 types-boto3
 types-sqlalchemy

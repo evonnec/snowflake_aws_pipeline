@@ -32,6 +32,7 @@ dependencies = [
     "pyproject-toml",
     "boto3",
     "mypy",
+    "ruff",
     "pandas-stubs",
     "types-jmespath",
     "types-sqlalchemy",

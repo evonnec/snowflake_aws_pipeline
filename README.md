@@ -37,7 +37,12 @@ To get started, follow these steps:
 
 1. Clone this git repo to a folder on your local computer and navigate to it
 2. Create a virtual environment in that folder
-3. Run `pip install -r requirements.txt` 
+  ```python3 -m venv amplifydata```
+  ```source amplifydata/bin/activate```
+3. Run `pip install -r requirements.txt`
+  Added pyproject.toml to project, and added relevant libraries for type checking. 
+  In order to skip libraries without type check libraries, ignore and override in pyproject.toml
+  ```pip install -e .```
 4. Running `python main.py` should read from a sample snowflake table and output the first 5 rows (twice)
 
 ### Assumptions
@@ -50,8 +55,27 @@ Our processing server has 1GB RAM.
 
 1. Runnable program written in Python
     1. Feel free to use any external libraries needed to accomplish the task
+        - installing and using mypy to find bugs
+        ```python3 -m mypy . --exclude amplifydata``` should return `Success: no issues found in source files`
+        - installing and using ruff to find formatting suggestions
+        ```ruff --fix main.py```
 2. Explain how to run your program 
+    2. For each of the tables, we ought to pass in the date column in which to group by month, and the column to sum.
+    We could potentially have pulled out the schemas of the tables for datetime col's and int/float/etc col's in order to do the group by and sum, but some tables had more than one col.
+    Specifying explicitly, we know what we have.
+  ```python3 main.py --table_name 'LOCATIONS_595' --sum_column 'AREA_KM2' --group_column 'DOB'```
+  ```python3 main.py --table_name 'ORDERS_100K' --sum_column 'O_TOTALPRICE' --group_column 'O_ORDERDATE'```
+  ```python3 main.py --table_name 'MOVIE_RATINGS_27M' --sum_column 'RATING' --group_column 'TIMESTAMP'```
+    Format Options:
+    - we can choose to stream io bytes or write to a file format
+    - file formats that would work are .parquet or .json
+    - we chose .json for now, and specify the `orient` parameter to give an orientation to determine how we'd like to see the output. 
+    for now, we've used `records` so we can pretty print the results 
 3. Any other comments you would like to include
+    - we pull from the database twice to do the transform. ideally this would be one pull per time the program runs. and give it the filter before it returns all the results.
+    - pull the secrets using secrets manager or similar, not have them in the code.
+    - abstraction of more of the hard-coded elements
+    - notes in code to see
 4. Live review meeting to discuss the below questions
 
 ### Review Meeting
@@ -59,11 +83,21 @@ Our processing server has 1GB RAM.
 We'll discuss the following questions (plus any other relevant follow-ups):
 
 1. Provide a brief explanation of your architecture and any external libraries used. Would you architect it differently if you had more time?
+  - brief architecture is that the program takes in a table, and a group by column (i.e. datetime) and a sum column (i.e. some numeric field) and sums the numeric field grouped by the month and year.
+  - it transforms it as required (no fully null rows), and pushes the result in the form of a dataframe.
+  - we use pandas dataframe for this example
+  - holding in memory can be expensive as is writing to disk. we can make additional considerations if the data is too much for the resources it has and take a look at numpy or Spark.
+  - If I had more time, I'd probably clean it up more, further modularize the code, add tests for each item, and handle exceptions clearly.
 2. If you had to handle file sizes larger than 1GB, how would you change your program (if at all)? Larger than 1TB?
+  - Yes, as I stated before, we might have to move away from a dataframe and move to a native data structure in python object instead.
 3. How would you test that your program is working?
+  - I would write tests in a test suite using pytest, then have CI run those tests each time code is pushed.
 4. If you had more time, what other features would you include?
+  - the items I wrote above
 5. What was the most difficult part of this problem? If you were running this assessment, what would you change?
+  - getting used to libraries I haven't worked with that much. If I were running this assessment, I'd perhaps make the transform more clear as to exact expected output with a sample input example so it's clear what's expected. I would also maybe ask for different data type outputs to be handled and provide them based on what a client expects. also provide any specifics with respect to filename.
 
+create document here
 ## Evaluation
 
 You will be evaluated based on the following criteria:
