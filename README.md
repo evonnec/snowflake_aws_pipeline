@@ -58,7 +58,9 @@ Our processing server has 1GB RAM.
         - installing and using mypy to find bugs  
         ```python3 -m mypy . --exclude amplifydata``` should return `Success: no issues found in source files`  
         - installing and using ruff to find formatting suggestions  
-        ```ruff --fix main.py```  
+        ```ruff --fix main.py```
+        - installing and using black to format for me:
+        ```python3 -m black main.py``` 
 2. Explain how to run your program   
     2. For each of the tables, we ought to pass in the date column in which to group by month, and the column to sum.  
     We could potentially have pulled out the schemas of the tables for datetime col's and int/float/etc col's in order to do the group by and sum, but some tables had more than one col.  
