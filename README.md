@@ -1,6 +1,6 @@
 ## Background
 
-Amplify Data helps its customers distribute their data to external stakeholders. Prior to doing so, it is important to be able to clean and aggregate the data being transferred. We want to build some tooling to allow customers to transfer data between their system and their stakeholders’ systems.
+This data company helps its customers distribute their data to external stakeholders. Prior to doing so, it is important to be able to clean and aggregate the data being transferred. We want to build some tooling to allow customers to transfer data between their system and their stakeholders’ systems.
 
 ## Goals
 
@@ -37,8 +37,8 @@ To get started, follow these steps:
 
 1. Clone this git repo to a folder on your local computer and navigate to it
 2. Create a virtual environment in that folder  
-  ```python3 -m venv amplifydata```  
-  ```source amplifydata/bin/activate```  
+  ```python3 -m venv datacompany```  
+  ```source datacompany/bin/activate```  
 3. Run `pip install -r requirements.txt`  
   Added pyproject.toml to project, and added relevant libraries for type checking.  
   In order to skip libraries without type check libraries, ignore and override in pyproject.toml  
@@ -56,7 +56,7 @@ Our processing server has 1GB RAM.
 1. Runnable program written in Python
     1. Feel free to use any external libraries needed to accomplish the task
         - installing and using mypy to find bugs  
-        ```python3 -m mypy . --exclude amplifydata``` should return `Success: no issues found in source files`  
+        ```python3 -m mypy . --exclude datacompany``` should return `Success: no issues found in source files`  
         - installing and using ruff to find formatting suggestions  
         ```ruff --fix main.py```
         - installing and using black to format for me:
