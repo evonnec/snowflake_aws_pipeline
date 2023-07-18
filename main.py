@@ -6,6 +6,7 @@ import pandas as pd
 import argparse
 import logging
 import pathlib
+import os
 
 SNOWFLAKE_CREDENTIALS = {
     "user": "candidate",
@@ -19,9 +20,9 @@ SNOWFLAKE_CREDENTIALS = {
 """
 TODO: abstract buckets, access key IDs and secret access keys
 """
-AWS_STORAGE_BUCKET_NAME = "amplifydata-evonnecho"
-AWS_ACCESS_KEY_ID = "AKIASC5E62QHDMBCP6FA"
-AWS_SECRET_ACCESS_KEY = "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"
+AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 
 parser = argparse.ArgumentParser(
     description="Pull client data from Snowflake, transform output, push to S3"
@@ -112,11 +113,19 @@ def transfer_data(table_name: str, storage_bucket: str, data: pd.DataFrame) -> d
     filename = f"{table_name}_{random_name}_{timestamp}.json"
     body = create_file_from_data(transformed_source_data=data)
 
-    s3.meta.client.put_object(
+    result = s3.meta.client.put_object(
         Body=body, Key=filename, Bucket=storage_bucket, ContentType="application/json"
-    )
-    logging.info('File "%s" is transferred', filename)
+    ) # ideally, we'd like to detect what type of file was uploaded, or send 
+    # that metadata with the bytes datatype that was sent from create_file_from_data function           
+    # content_type = media_response.headers["Content-Type"]
+    # extension = mimetypes.guess_extension(content_type)
 
+    metadata_resp = result.get("ResponseMetadata", {})
+    if metadata_resp.get("HTTPStatusCode") == 200:
+        logging.info('File "%s" is transferred', filename)
+    else:
+        logging.info('Failed to transfer file "%s"', filename)
+        
     row_count = len(data)
     results = {"file_name": filename, "row_count": row_count, "timestamp": timestamp}
     logging.info('Results are "%s"', results)
@@ -133,6 +142,9 @@ def create_file_from_data(transformed_source_data: pd.DataFrame) -> bytes:
     random_name = uuid.uuid4().hex
     timestamp = time.strftime("%Y%m%d-%H%M%S")
     json_file = f"snowflake_data_{random_name}_{timestamp}.json"
+    # ideally we'd like to parameterize the filetype and determine
+    # what to pass as the filetype to create here in this function.
+    # then pass that file to read_bytes function from pathlib library.
     transformed_source_data.to_json(
         path_or_buf=json_file, orient="records", compression="infer", index=True
     )
