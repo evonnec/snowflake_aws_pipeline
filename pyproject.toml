@@ -1,6 +1,6 @@
 # configuration for linters and project
 [project]
-name = "amplifydata-data-transfer-app"
+name = "snowflake-data-transfer-to-aws-app"
 dependencies = [
     "asn1crypto==1.5.1",
     "certifi==2023.5.7",
