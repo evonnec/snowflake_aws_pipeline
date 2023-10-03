@@ -28,7 +28,7 @@ dependencies = [
     "sortedcontainers==2.4.0",
     "SQLAlchemy==1.4.48",
     "typing_extensions==4.6.3",
-    "urllib3==1.26.16",
+    "urllib3==1.26.17",
     "pyproject-toml",
     "boto3",
     "mypy",
