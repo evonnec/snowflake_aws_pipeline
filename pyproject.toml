@@ -7,7 +7,7 @@ dependencies = [
     "cffi==1.15.1",
     "charset-normalizer==2.1.1",
     "cryptography==43.0.1",
-    "filelock==3.12.2",
+    "filelock==3.20.1",
     "greenlet==2.0.2",
     "idna==3.7",
     "numpy==1.24.3",
