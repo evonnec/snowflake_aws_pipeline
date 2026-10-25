@@ -11,11 +11,6 @@ dependencies = [
     "snowflake-connector-python[pandas]>=5.1",
     "snowflake-sqlalchemy>=2.0",
     "SQLAlchemy>=2.0.55",
-    # floors kept from previous security bumps
-    "cryptography>=50.0.0",
-    "pyOpenSSL>=26.4.0",
-    "requests>=2.33.0",
-    "urllib3>=2.8.0",
 ]
 
 [dependency-groups]
@@ -24,6 +19,15 @@ dev = [
     "ruff>=0.14",
     "pandas-stubs",
     "boto3-stubs[s3]",
+]
+
+[tool.uv]
+# floors from previous security bumps; applied only if something depends on them
+constraint-dependencies = [
+    "cryptography>=50.0.0",
+    "pyOpenSSL>=26.4.0",
+    "requests>=2.33.0",
+    "urllib3>=2.8.0",
 ]
 
 [tool.ruff]
@@ -35,7 +39,13 @@ ignore = ["E501"]
 
 [tool.mypy]
 python_version = "3.14"
+strict = true
+
+# snowflake.sqlalchemy builds __all__ from concatenated tuples, which mypy can't follow
+[[tool.mypy.overrides]]
+module = ["snowflake.sqlalchemy"]
+implicit_reexport = true
 
 [[tool.mypy.overrides]]
-module = ["snowflake.sqlalchemy", "snowflake.connector", "snowflake.connector.options", "pyarrow", "pyarrow.parquet"]
+module = ["pyarrow", "pyarrow.parquet"]
 ignore_missing_imports = true
