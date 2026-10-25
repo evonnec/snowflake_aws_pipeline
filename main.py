@@ -1,15 +1,20 @@
 import argparse
 import logging
 import os
-import pathlib
 import time
 import uuid
+from collections.abc import Sequence
 from typing import ReadOnly, TypedDict
 
 import boto3
 import pandas as pd
 
-from snowflake_service import SnowflakeCredentials, SnowflakeService
+from snowflake_service import (
+    MissingCredentialsError,
+    SnowflakeCredentials,
+    SnowflakeService,
+    credentials_from_env,
+)
 
 
 class TransferResult(TypedDict):
@@ -18,15 +23,6 @@ class TransferResult(TypedDict):
     timestamp: ReadOnly[str]
 
 
-SNOWFLAKE_CREDENTIALS: SnowflakeCredentials = {
-    "user": "candidate",
-    "password": "***REMOVED***",
-    "account": "PZMAOVJ-AMPLIFY_PUBLIC",
-    "database": "PUBLIC",
-    "schema": "PUBLIC",
-    "warehouse": "PUBLIC",
-    "role": "PUBLIC",
-}
 """
 TODO: abstract buckets, access key IDs and secret access keys
 """
@@ -34,40 +30,9 @@ AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 
-parser = argparse.ArgumentParser(
-    description="Pull client data from Snowflake, transform output, push to S3"
-)
-parser.add_argument(
-    "--table_name",
-    default="LOCATIONS_595",
-    help="specify the table to retrieve from SnowFlake, make aggregations, push to S3",
-    required=False,
-)
-parser.add_argument(
-    "--bucket_name",
-    default=AWS_STORAGE_BUCKET_NAME,
-    help="specify the s3 bucket to move to",
-    required=False,
-)
-parser.add_argument(
-    "--group_column",
-    default=None,
-    help="references a datetime typed col in order to do a monthly aggregation field",
-    required=True,
-)
-parser.add_argument(
-    "--sum_column",
-    default=None,
-    help="references a float int or similiar typed col in order to sum a numeric field \
-    by the specified group_column",
-    required=True,
-)
-
-args = parser.parse_args()
-
 
 def snowflake_df_read_and_filter(
-    table_name: str, group_col: str, sum_col: str
+    table_name: str, group_col: str, sum_col: str, credentials: SnowflakeCredentials
 ) -> pd.DataFrame:
     """
     function that reads a Snowflake table with group_col,
@@ -79,7 +44,7 @@ def snowflake_df_read_and_filter(
     For numeric columns, use SUM aggregation.
     """
 
-    with SnowflakeService(**SNOWFLAKE_CREDENTIALS) as ss:
+    with SnowflakeService(**credentials) as ss:
         df_all = ss.get_df_from_query(t"SELECT * FROM {table_name}")
         df_filtered = ss.get_df_from_query(
             t"SELECT sum({sum_col}), MONTH({group_col}) as MONTH, "
@@ -149,38 +114,75 @@ def transfer_data(
 
 
 def create_file_from_data(transformed_source_data: pd.DataFrame) -> bytes:
-    """create a file from pandas DataFrame
-    returns: str
-    __description: the string is the path to json file
+    """serialize a pandas DataFrame to JSON records in memory, ready to upload
+    returns: bytes
     Args:
         transformed_source_data (pd.DataFrame): DataFrame of output
     """
-    random_name = uuid.uuid7().hex
-    timestamp = time.strftime("%Y%m%d-%H%M%S")
-    json_file = f"snowflake_data_{random_name}_{timestamp}.json"
-    # ideally we'd like to parameterize the filetype and determine
-    # what to pass as the filetype to create here in this function.
-    # then pass that file to read_bytes function from pathlib library.
-    transformed_source_data.to_json(
-        path_or_buf=json_file, orient="records", compression="infer"
+    # ideally we'd like to parameterize the filetype (e.g. parquet)
+    # and serialize accordingly here in this function.
+    return transformed_source_data.to_json(orient="records").encode()
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Pull client data from Snowflake, transform output, push to S3"
     )
-    logging.info('File named "%s" created', json_file)
-    contents_in_bytes = pathlib.Path(json_file).read_bytes()
-    return contents_in_bytes
+    parser.add_argument(
+        "--table_name",
+        default="LOCATIONS_595",
+        help="specify the table to retrieve from SnowFlake, make aggregations, push to S3",
+        required=False,
+    )
+    parser.add_argument(
+        "--bucket_name",
+        default=AWS_STORAGE_BUCKET_NAME,
+        help="specify the s3 bucket to move to",
+        required=False,
+    )
+    parser.add_argument(
+        "--group_column",
+        default=None,
+        help="references a datetime typed col in order to do a monthly aggregation field",
+        required=True,
+    )
+    parser.add_argument(
+        "--sum_column",
+        default=None,
+        help="references a float int or similiar typed col in order to sum a numeric field \
+        by the specified group_column",
+        required=True,
+    )
+    return parser
 
 
-if __name__ == "__main__":
-    logging.info(f"READING {args.table_name} SQL TABLE INTO PANDAS DATAFRAME\n")
+def main(argv: Sequence[str] | None = None) -> TransferResult:
+    logging.basicConfig(level=logging.INFO)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.bucket_name is None:
+        parser.error("--bucket_name or AWS_STORAGE_BUCKET_NAME is required")
+    try:
+        credentials = credentials_from_env()
+    except MissingCredentialsError as e:
+        parser.error(str(e))
+
+    logging.info("READING %s SQL TABLE INTO PANDAS DATAFRAME", args.table_name)
     result = snowflake_df_read_and_filter(
         table_name=args.table_name,
         group_col=args.group_column,
         sum_col=args.sum_column,
+        credentials=credentials,
     )
 
-    tablename = args.table_name
-    bucketname = args.bucket_name
-
-    logging.info(f"TRANSFERRING PANDAS DATAFRAME FROM {args.table_name} TO S3\n")
-    transfer_data(table_name=tablename, data=result, storage_bucket=bucketname)
+    logging.info("TRANSFERRING PANDAS DATAFRAME FROM %s TO S3", args.table_name)
+    results = transfer_data(
+        table_name=args.table_name, data=result, storage_bucket=args.bucket_name
+    )
 
     logging.info("PROCESSING COMPLETED")
+    return results
+
+
+if __name__ == "__main__":
+    main()
