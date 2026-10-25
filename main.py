@@ -1,7 +1,6 @@
 import argparse
 import logging
 import os
-import pathlib
 import time
 import uuid
 from collections.abc import Sequence
@@ -10,7 +9,12 @@ from typing import ReadOnly, TypedDict
 import boto3
 import pandas as pd
 
-from snowflake_service import SnowflakeCredentials, SnowflakeService
+from snowflake_service import (
+    MissingCredentialsError,
+    SnowflakeCredentials,
+    SnowflakeService,
+    credentials_from_env,
+)
 
 
 class TransferResult(TypedDict):
@@ -19,15 +23,6 @@ class TransferResult(TypedDict):
     timestamp: ReadOnly[str]
 
 
-SNOWFLAKE_CREDENTIALS: SnowflakeCredentials = {
-    "user": "candidate",
-    "password": "AmplifyData1",
-    "account": "PZMAOVJ-AMPLIFY_PUBLIC",
-    "database": "PUBLIC",
-    "schema": "PUBLIC",
-    "warehouse": "PUBLIC",
-    "role": "PUBLIC",
-}
 """
 TODO: abstract buckets, access key IDs and secret access keys
 """
@@ -37,7 +32,7 @@ AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 
 
 def snowflake_df_read_and_filter(
-    table_name: str, group_col: str, sum_col: str
+    table_name: str, group_col: str, sum_col: str, credentials: SnowflakeCredentials
 ) -> pd.DataFrame:
     """
     function that reads a Snowflake table with group_col,
@@ -49,7 +44,7 @@ def snowflake_df_read_and_filter(
     For numeric columns, use SUM aggregation.
     """
 
-    with SnowflakeService(**SNOWFLAKE_CREDENTIALS) as ss:
+    with SnowflakeService(**credentials) as ss:
         df_all = ss.get_df_from_query(t"SELECT * FROM {table_name}")
         df_filtered = ss.get_df_from_query(
             t"SELECT sum({sum_col}), MONTH({group_col}) as MONTH, "
@@ -119,24 +114,14 @@ def transfer_data(
 
 
 def create_file_from_data(transformed_source_data: pd.DataFrame) -> bytes:
-    """create a file from pandas DataFrame
-    returns: str
-    __description: the string is the path to json file
+    """serialize a pandas DataFrame to JSON records in memory, ready to upload
+    returns: bytes
     Args:
         transformed_source_data (pd.DataFrame): DataFrame of output
     """
-    random_name = uuid.uuid7().hex
-    timestamp = time.strftime("%Y%m%d-%H%M%S")
-    json_file = f"snowflake_data_{random_name}_{timestamp}.json"
-    # ideally we'd like to parameterize the filetype and determine
-    # what to pass as the filetype to create here in this function.
-    # then pass that file to read_bytes function from pathlib library.
-    transformed_source_data.to_json(
-        path_or_buf=json_file, orient="records", compression="infer"
-    )
-    logging.info('File named "%s" created', json_file)
-    contents_in_bytes = pathlib.Path(json_file).read_bytes()
-    return contents_in_bytes
+    # ideally we'd like to parameterize the filetype (e.g. parquet)
+    # and serialize accordingly here in this function.
+    return transformed_source_data.to_json(orient="records").encode()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -177,12 +162,17 @@ def main(argv: Sequence[str] | None = None) -> TransferResult:
     args = parser.parse_args(argv)
     if args.bucket_name is None:
         parser.error("--bucket_name or AWS_STORAGE_BUCKET_NAME is required")
+    try:
+        credentials = credentials_from_env()
+    except MissingCredentialsError as e:
+        parser.error(str(e))
 
     logging.info("READING %s SQL TABLE INTO PANDAS DATAFRAME", args.table_name)
     result = snowflake_df_read_and_filter(
         table_name=args.table_name,
         group_col=args.group_column,
         sum_col=args.sum_column,
+        credentials=credentials,
     )
 
     logging.info("TRANSFERRING PANDAS DATAFRAME FROM %s TO S3", args.table_name)

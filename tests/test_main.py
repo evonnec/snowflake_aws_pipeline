@@ -14,6 +14,15 @@ import main
 from snowflake_service import SnowflakeCredentials, sql
 
 BUCKET = "test-bucket"
+CREDENTIALS: SnowflakeCredentials = {
+    "user": "user",
+    "password": "password",
+    "account": "account",
+    "database": "database",
+    "schema": "schema",
+    "warehouse": "warehouse",
+    "role": "role",
+}
 
 
 class FakeSnowflakeService:
@@ -61,12 +70,16 @@ def fake_snowflake(monkeypatch: pytest.MonkeyPatch) -> list[str]:
 
 
 @pytest.fixture
-def s3_bucket(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[str]:
+def snowflake_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    for key, value in CREDENTIALS.items():
+        monkeypatch.setenv(f"SNOWFLAKE_{key.upper()}", str(value))
+
+
+@pytest.fixture
+def s3_bucket(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
     monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
-    # create_file_from_data writes its JSON file to the working directory
-    monkeypatch.chdir(tmp_path)
     with mock_aws():
         boto3.client("s3").create_bucket(Bucket=BUCKET)
         yield BUCKET
@@ -85,7 +98,9 @@ def test_parser_defaults() -> None:
 
 
 def test_read_and_filter_adds_monthly_sum(fake_snowflake: list[str]) -> None:
-    df = main.snowflake_df_read_and_filter("LOCATIONS_595", "DOB", "AREA_KM2")
+    df = main.snowflake_df_read_and_filter(
+        "LOCATIONS_595", "DOB", "AREA_KM2", CREDENTIALS
+    )
 
     assert fake_snowflake[0] == "SELECT * FROM LOCATIONS_595"
     assert "GROUP BY MONTH(DOB), YEAR(DOB)" in fake_snowflake[1]
@@ -97,7 +112,9 @@ def test_read_and_filter_adds_monthly_sum(fake_snowflake: list[str]) -> None:
 
 def test_read_and_filter_rejects_sql_injection(fake_snowflake: list[str]) -> None:
     with pytest.raises(ValueError, match="not a valid Snowflake identifier"):
-        main.snowflake_df_read_and_filter("T; DROP TABLE T", "DOB", "AREA_KM2")
+        main.snowflake_df_read_and_filter(
+            "T; DROP TABLE T", "DOB", "AREA_KM2", CREDENTIALS
+        )
     assert fake_snowflake == []
 
 
@@ -108,7 +125,8 @@ def test_create_file_from_data(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     contents = main.create_file_from_data(df)
 
     assert json.loads(contents) == [{"A": 1, "B": "x"}, {"A": 2, "B": "y"}]
-    assert len(list(tmp_path.glob("snowflake_data_*.json"))) == 1
+    # serialized in memory; nothing is left behind on disk
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_transfer_data_uploads_json(s3_bucket: str) -> None:
@@ -123,6 +141,7 @@ def test_transfer_data_uploads_json(s3_bucket: str) -> None:
     assert json.loads(obj["Body"].read()) == [{"A": 1}, {"A": 2}, {"A": 3}]
 
 
+@pytest.mark.usefixtures("snowflake_env")
 def test_main_end_to_end(fake_snowflake: list[str], s3_bucket: str) -> None:
     result = main.main(
         [
@@ -152,4 +171,23 @@ def test_main_requires_bucket(
     with pytest.raises(SystemExit):
         main.main(["--group_column", "DOB", "--sum_column", "AREA_KM2"])
     # fails fast, before reading from Snowflake
+    assert fake_snowflake == []
+
+
+def test_main_requires_snowflake_credentials(
+    monkeypatch: pytest.MonkeyPatch, fake_snowflake: list[str]
+) -> None:
+    for key in CREDENTIALS:
+        monkeypatch.delenv(f"SNOWFLAKE_{key.upper()}", raising=False)
+    with pytest.raises(SystemExit):
+        main.main(
+            [
+                "--group_column",
+                "DOB",
+                "--sum_column",
+                "AREA_KM2",
+                "--bucket_name",
+                BUCKET,
+            ]
+        )
     assert fake_snowflake == []

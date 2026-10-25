@@ -29,7 +29,7 @@ The Snowflake database credentials are contained in `main.py`, along with some s
 - ORDERS_100K
 - MOVIE_RATINGS_27M
 
-Your destination S3 bucket and access credentials are provided in `main.py`.
+Snowflake and AWS credentials are read from environment variables (see Setup); nothing secret lives in the code.
 
 ### Setup
 
@@ -38,7 +38,8 @@ To get started, follow these steps:
 1. Clone this git repo to a folder on your local computer and navigate to it
 2. Install [uv](https://docs.astral.sh/uv/) (e.g. `brew install uv`). The project targets Python 3.14 (pinned in `.python-version`); uv downloads it if needed.  
 3. Run `uv sync` to create `.venv` with the locked dependencies (`uv.lock`) and dev tools.  
-4. Running `uv run main.py` should read from a sample snowflake table and output the first 5 rows (twice)  
+4. Copy `.env.example` to `.env` and fill in the Snowflake (`SNOWFLAKE_*`) and AWS values. `.env` is gitignored, so never commit it.  
+5. Run the pipeline with `uv run --env-file .env main.py --table_name ... --group_column ... --sum_column ...`. Variables exported in your shell work too; `--env-file` is just a convenience.  
 
 ### Development
 
@@ -76,9 +77,9 @@ Our processing server has 1GB RAM.
     Specifying explicitly, we group by a specific column instead of guessing which column we want to do the grouping by. Since it doesn't really make sense to sum by order key or customer key or shipping priority, we decide what column we want to sum by monthly aggregation which is total price.
     Perhaps we do want to handle multiple sums given a specific group column. In which case, we can take inventory of all the float columns by checking the schemas and returning the columns whose type can be summed by month and then rearchitect. 
     For simplicity, we specify the exact columns in this example code.  
-  ```uv run main.py --table_name 'LOCATIONS_595' --sum_column 'AREA_KM2' --group_column 'DOB'```  
-  ```uv run main.py --table_name 'ORDERS_100K' --sum_column 'O_TOTALPRICE' --group_column 'O_ORDERDATE'```  
-  ```uv run main.py --table_name 'MOVIE_RATINGS_27M' --sum_column 'RATING' --group_column 'TIMESTAMP'```  
+  ```uv run --env-file .env main.py --table_name 'LOCATIONS_595' --sum_column 'AREA_KM2' --group_column 'DOB'```  
+  ```uv run --env-file .env main.py --table_name 'ORDERS_100K' --sum_column 'O_TOTALPRICE' --group_column 'O_ORDERDATE'```  
+  ```uv run --env-file .env main.py --table_name 'MOVIE_RATINGS_27M' --sum_column 'RATING' --group_column 'TIMESTAMP'```  
     Format Options:  
     - we can choose to stream io bytes or write to a file format  
     - file formats that would work are .parquet or .json  
