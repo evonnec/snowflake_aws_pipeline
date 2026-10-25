@@ -40,6 +40,19 @@ To get started, follow these steps:
 3. Run `uv sync` to create `.venv` with the locked dependencies (`uv.lock`) and dev tools.  
 4. Running `uv run main.py` should read from a sample snowflake table and output the first 5 rows (twice)  
 
+### Development
+
+`uv sync` installs everything in the `dev` dependency group. These are the same checks CI runs (`.github/workflows/ci.yml`) on every pull request and push to `main`:
+
+| Stage | Command |
+| --- | --- |
+| Test | `uv run pytest` |
+| Lint | `uv run ruff check .` |
+| Type check | `uv run mypy` |
+| Format | `uv run ruff format --check .` (drop `--check` to apply) |
+
+Tests use a fake Snowflake service and [moto](https://github.com/getmoto/moto) for S3, so they need no credentials or network access.
+
 ### Assumptions
 
 You can assume the credentials will provide the appropriate access (please reach out if you have any issues).
@@ -50,8 +63,8 @@ Our processing server has 1GB RAM.
 
 1. Runnable program written in Python
     1. Feel free to use any external libraries needed to accomplish the task
-        - type checking with mypy:  
-        ```uv run mypy main.py snowflake_service.py write_to_parquet.py``` should return `Success: no issues found in source files`  
+        - type checking with mypy (strict mode, files configured in `pyproject.toml`):  
+        ```uv run mypy``` should return `Success: no issues found in source files`  
         - linting with ruff:  
         ```uv run ruff check .```
         - formatting with ruff (replaces black):  

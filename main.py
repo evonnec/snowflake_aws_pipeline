@@ -4,6 +4,7 @@ import os
 import pathlib
 import time
 import uuid
+from collections.abc import Sequence
 from typing import ReadOnly, TypedDict
 
 import boto3
@@ -33,37 +34,6 @@ TODO: abstract buckets, access key IDs and secret access keys
 AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-
-parser = argparse.ArgumentParser(
-    description="Pull client data from Snowflake, transform output, push to S3"
-)
-parser.add_argument(
-    "--table_name",
-    default="LOCATIONS_595",
-    help="specify the table to retrieve from SnowFlake, make aggregations, push to S3",
-    required=False,
-)
-parser.add_argument(
-    "--bucket_name",
-    default=AWS_STORAGE_BUCKET_NAME,
-    help="specify the s3 bucket to move to",
-    required=False,
-)
-parser.add_argument(
-    "--group_column",
-    default=None,
-    help="references a datetime typed col in order to do a monthly aggregation field",
-    required=True,
-)
-parser.add_argument(
-    "--sum_column",
-    default=None,
-    help="references a float int or similiar typed col in order to sum a numeric field \
-    by the specified group_column",
-    required=True,
-)
-
-args = parser.parse_args()
 
 
 def snowflake_df_read_and_filter(
@@ -169,18 +139,60 @@ def create_file_from_data(transformed_source_data: pd.DataFrame) -> bytes:
     return contents_in_bytes
 
 
-if __name__ == "__main__":
-    logging.info(f"READING {args.table_name} SQL TABLE INTO PANDAS DATAFRAME\n")
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Pull client data from Snowflake, transform output, push to S3"
+    )
+    parser.add_argument(
+        "--table_name",
+        default="LOCATIONS_595",
+        help="specify the table to retrieve from SnowFlake, make aggregations, push to S3",
+        required=False,
+    )
+    parser.add_argument(
+        "--bucket_name",
+        default=AWS_STORAGE_BUCKET_NAME,
+        help="specify the s3 bucket to move to",
+        required=False,
+    )
+    parser.add_argument(
+        "--group_column",
+        default=None,
+        help="references a datetime typed col in order to do a monthly aggregation field",
+        required=True,
+    )
+    parser.add_argument(
+        "--sum_column",
+        default=None,
+        help="references a float int or similiar typed col in order to sum a numeric field \
+        by the specified group_column",
+        required=True,
+    )
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> TransferResult:
+    logging.basicConfig(level=logging.INFO)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.bucket_name is None:
+        parser.error("--bucket_name or AWS_STORAGE_BUCKET_NAME is required")
+
+    logging.info("READING %s SQL TABLE INTO PANDAS DATAFRAME", args.table_name)
     result = snowflake_df_read_and_filter(
         table_name=args.table_name,
         group_col=args.group_column,
         sum_col=args.sum_column,
     )
 
-    tablename = args.table_name
-    bucketname = args.bucket_name
-
-    logging.info(f"TRANSFERRING PANDAS DATAFRAME FROM {args.table_name} TO S3\n")
-    transfer_data(table_name=tablename, data=result, storage_bucket=bucketname)
+    logging.info("TRANSFERRING PANDAS DATAFRAME FROM %s TO S3", args.table_name)
+    results = transfer_data(
+        table_name=args.table_name, data=result, storage_bucket=args.bucket_name
+    )
 
     logging.info("PROCESSING COMPLETED")
+    return results
+
+
+if __name__ == "__main__":
+    main()
