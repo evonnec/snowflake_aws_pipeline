@@ -36,14 +36,9 @@ Your destination S3 bucket and access credentials are provided in `main.py`.
 To get started, follow these steps:
 
 1. Clone this git repo to a folder on your local computer and navigate to it
-2. Create a virtual environment in that folder  
-  ```python3 -m venv datacompany```  
-  ```source datacompany/bin/activate```  
-3. Run `pip install -r requirements.txt`  
-  Added pyproject.toml to project, and added relevant libraries for type checking.  
-  In order to skip libraries without type check libraries, ignore and override in pyproject.toml  
-  ```pip install -e .```  
-4. Running `python main.py` should read from a sample snowflake table and output the first 5 rows (twice)  
+2. Install [uv](https://docs.astral.sh/uv/) (e.g. `brew install uv`). The project targets Python 3.14 (pinned in `.python-version`); uv downloads it if needed.  
+3. Run `uv sync` to create `.venv` with the locked dependencies (`uv.lock`) and dev tools.  
+4. Running `uv run main.py` should read from a sample snowflake table and output the first 5 rows (twice)  
 
 ### Assumptions
 
@@ -55,12 +50,12 @@ Our processing server has 1GB RAM.
 
 1. Runnable program written in Python
     1. Feel free to use any external libraries needed to accomplish the task
-        - installing and using mypy to find bugs  
-        ```python3 -m mypy . --exclude datacompany``` should return `Success: no issues found in source files`  
-        - installing and using ruff to find formatting suggestions  
-        ```ruff --fix main.py```
-        - installing and using black to format for me:
-        ```python3 -m black main.py``` 
+        - type checking with mypy:  
+        ```uv run mypy main.py snowflake_service.py write_to_parquet.py``` should return `Success: no issues found in source files`  
+        - linting with ruff:  
+        ```uv run ruff check .```
+        - formatting with ruff (replaces black):  
+        ```uv run ruff format .``` 
 2. Explain how to run your program   
     2. For each of the tables, we ought to pass in the date column in which to group by month, and the column to sum.  
     We could potentially have pulled out the schemas of the tables for datetime col's and int/float/etc col's in order to do the group by and sum, but some tables had more than one col.  
@@ -68,9 +63,9 @@ Our processing server has 1GB RAM.
     Specifying explicitly, we group by a specific column instead of guessing which column we want to do the grouping by. Since it doesn't really make sense to sum by order key or customer key or shipping priority, we decide what column we want to sum by monthly aggregation which is total price.
     Perhaps we do want to handle multiple sums given a specific group column. In which case, we can take inventory of all the float columns by checking the schemas and returning the columns whose type can be summed by month and then rearchitect. 
     For simplicity, we specify the exact columns in this example code.  
-  ```python3 main.py --table_name 'LOCATIONS_595' --sum_column 'AREA_KM2' --group_column 'DOB'```  
-  ```python3 main.py --table_name 'ORDERS_100K' --sum_column 'O_TOTALPRICE' --group_column 'O_ORDERDATE'```  
-  ```python3 main.py --table_name 'MOVIE_RATINGS_27M' --sum_column 'RATING' --group_column 'TIMESTAMP'```  
+  ```uv run main.py --table_name 'LOCATIONS_595' --sum_column 'AREA_KM2' --group_column 'DOB'```  
+  ```uv run main.py --table_name 'ORDERS_100K' --sum_column 'O_TOTALPRICE' --group_column 'O_ORDERDATE'```  
+  ```uv run main.py --table_name 'MOVIE_RATINGS_27M' --sum_column 'RATING' --group_column 'TIMESTAMP'```  
     Format Options:  
     - we can choose to stream io bytes or write to a file format  
     - file formats that would work are .parquet or .json  

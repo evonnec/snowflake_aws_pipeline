@@ -1,14 +1,24 @@
-from snowflake_service import SnowflakeService
-import boto3
-import uuid
-import time
-import pandas as pd
 import argparse
 import logging
-import pathlib
 import os
+import pathlib
+import time
+import uuid
+from typing import ReadOnly, TypedDict
 
-SNOWFLAKE_CREDENTIALS = {
+import boto3
+import pandas as pd
+
+from snowflake_service import SnowflakeCredentials, SnowflakeService
+
+
+class TransferResult(TypedDict):
+    file_name: ReadOnly[str]
+    row_count: ReadOnly[int]
+    timestamp: ReadOnly[str]
+
+
+SNOWFLAKE_CREDENTIALS: SnowflakeCredentials = {
     "user": "candidate",
     "password": "***REMOVED***",
     "account": "PZMAOVJ-AMPLIFY_PUBLIC",
@@ -70,19 +80,19 @@ def snowflake_df_read_and_filter(
     """
 
     with SnowflakeService(**SNOWFLAKE_CREDENTIALS) as ss:
-        df_all = ss.get_df_from_query(f"SELECT * FROM {table_name}")
+        df_all = ss.get_df_from_query(t"SELECT * FROM {table_name}")
         df_filtered = ss.get_df_from_query(
-            f"SELECT sum({sum_col}), MONTH({group_col}) as MONTH, \
-                YEAR({group_col}) as YEAR FROM {table_name} \
-                GROUP BY MONTH({group_col}), YEAR({group_col})"
+            t"SELECT sum({sum_col}), MONTH({group_col}) as MONTH, "
+            t"YEAR({group_col}) as YEAR FROM {table_name} "
+            t"GROUP BY MONTH({group_col}), YEAR({group_col})"
         )
     df_all["MONTH"] = pd.DatetimeIndex(df_all[group_col]).month
     df_all["YEAR"] = pd.DatetimeIndex(df_all[group_col]).year
     df_join = (
         df_all.merge(df_filtered, on=["MONTH", "YEAR"], how="left")
         .drop("MONTH", axis=1)
-        .drop("YEAR", axis=1)  
-      # .drop(sum_col, axis=1 \
+        .drop("YEAR", axis=1)
+        # .drop(sum_col, axis=1)
         .dropna(how="all")
     )
     ### TODO: unclear on whether to drop `sum_col` -- check
@@ -90,7 +100,9 @@ def snowflake_df_read_and_filter(
     return df_join
 
 
-def transfer_data(table_name: str, storage_bucket: str, data: pd.DataFrame) -> dict:
+def transfer_data(
+    table_name: str, storage_bucket: str, data: pd.DataFrame
+) -> TransferResult:
     """Takes result of transformed source data
     create_file_from_data(transformed_data) and create file
     open session to s3, push file to s3
@@ -108,15 +120,15 @@ def transfer_data(table_name: str, storage_bucket: str, data: pd.DataFrame) -> d
 
     s3 = session.resource("s3")
 
-    random_name = uuid.uuid4().hex
+    random_name = uuid.uuid7().hex
     timestamp = time.strftime("%Y%m%d-%H%M%S")
     filename = f"{table_name}_{random_name}_{timestamp}.json"
     body = create_file_from_data(transformed_source_data=data)
 
     result = s3.meta.client.put_object(
         Body=body, Key=filename, Bucket=storage_bucket, ContentType="application/json"
-    ) # ideally, we'd like to detect what type of file was uploaded, or send 
-    # that metadata with the bytes datatype that was sent from create_file_from_data function           
+    )  # ideally, we'd like to detect what type of file was uploaded, or send
+    # that metadata with the bytes datatype that was sent from create_file_from_data function
     # content_type = media_response.headers["Content-Type"]
     # extension = mimetypes.guess_extension(content_type)
 
@@ -125,9 +137,13 @@ def transfer_data(table_name: str, storage_bucket: str, data: pd.DataFrame) -> d
         logging.info('File "%s" is transferred', filename)
     else:
         logging.info('Failed to transfer file "%s"', filename)
-        
+
     row_count = len(data)
-    results = {"file_name": filename, "row_count": row_count, "timestamp": timestamp}
+    results: TransferResult = {
+        "file_name": filename,
+        "row_count": row_count,
+        "timestamp": timestamp,
+    }
     logging.info('Results are "%s"', results)
     return results
 
@@ -139,14 +155,14 @@ def create_file_from_data(transformed_source_data: pd.DataFrame) -> bytes:
     Args:
         transformed_source_data (pd.DataFrame): DataFrame of output
     """
-    random_name = uuid.uuid4().hex
+    random_name = uuid.uuid7().hex
     timestamp = time.strftime("%Y%m%d-%H%M%S")
     json_file = f"snowflake_data_{random_name}_{timestamp}.json"
     # ideally we'd like to parameterize the filetype and determine
     # what to pass as the filetype to create here in this function.
     # then pass that file to read_bytes function from pathlib library.
     transformed_source_data.to_json(
-        path_or_buf=json_file, orient="records", compression="infer", index=True
+        path_or_buf=json_file, orient="records", compression="infer"
     )
     logging.info('File named "%s" created', json_file)
     contents_in_bytes = pathlib.Path(json_file).read_bytes()
@@ -156,9 +172,9 @@ def create_file_from_data(transformed_source_data: pd.DataFrame) -> bytes:
 if __name__ == "__main__":
     logging.info(f"READING {args.table_name} SQL TABLE INTO PANDAS DATAFRAME\n")
     result = snowflake_df_read_and_filter(
-        table_name=f"{args.table_name}",
-        group_col=f"{args.group_column}",
-        sum_col=f"{args.sum_column}",
+        table_name=args.table_name,
+        group_col=args.group_column,
+        sum_col=args.sum_column,
     )
 
     tablename = args.table_name
