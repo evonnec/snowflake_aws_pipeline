@@ -1,0 +1,23 @@
+version: 2
+updates:
+  # keeps uv.lock current; security updates still open as their own PRs
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    # wait a week before adopting new releases (security updates are exempt)
+    cooldown:
+      default-days: 7
+    groups:
+      python-dependencies:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  # keeps the SHA-pinned actions in .github/workflows current
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # wait a week before adopting new releases (security updates are exempt)
+    cooldown:
+      default-days: 7
