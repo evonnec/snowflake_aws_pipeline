@@ -21,6 +21,10 @@ To make this easier to use in an API endpoint, you should have a main function 
 }
 ```
 
+#### Example output
+
+`snowflake_data_81ad294cbb7842a491dec9670a6bd192_20230629-150002.json` is an example of the JSON the pipeline uploads to S3, for `--table_name ORDERS_100K --group_column O_ORDERDATE --sum_column O_TOTALPRICE`. It has one record per source row (8,911 rows, January–August 1998), each carrying its month's total in `SUM(O_TOTALPRICE)`. Timestamps (`O_ORDERDATE`, `CREATED_AT`) are epoch milliseconds, pandas' default for `to_json`.
+
 ### Inputs
 
 The Snowflake database credentials are contained in `main.py`, along with some starter code for pulling data from Snowflake.  There are 3 sample tables available on the PUBLIC database:
