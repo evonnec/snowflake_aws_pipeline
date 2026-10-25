@@ -35,8 +35,7 @@ AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 
 parser = argparse.ArgumentParser(
-    description="Pull client data from Snowflake, transform output, push to S3",
-    suggest_on_error=True,
+    description="Pull client data from Snowflake, transform output, push to S3"
 )
 parser.add_argument(
     "--table_name",
