@@ -35,7 +35,8 @@ AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 
 parser = argparse.ArgumentParser(
-    description="Pull client data from Snowflake, transform output, push to S3"
+    description="Pull client data from Snowflake, transform output, push to S3",
+    suggest_on_error=True,
 )
 parser.add_argument(
     "--table_name",
@@ -120,7 +121,7 @@ def transfer_data(
 
     s3 = session.resource("s3")
 
-    random_name = uuid.uuid4().hex
+    random_name = uuid.uuid7().hex
     timestamp = time.strftime("%Y%m%d-%H%M%S")
     filename = f"{table_name}_{random_name}_{timestamp}.json"
     body = create_file_from_data(transformed_source_data=data)
@@ -155,7 +156,7 @@ def create_file_from_data(transformed_source_data: pd.DataFrame) -> bytes:
     Args:
         transformed_source_data (pd.DataFrame): DataFrame of output
     """
-    random_name = uuid.uuid4().hex
+    random_name = uuid.uuid7().hex
     timestamp = time.strftime("%Y%m%d-%H%M%S")
     json_file = f"snowflake_data_{random_name}_{timestamp}.json"
     # ideally we'd like to parameterize the filetype and determine
