@@ -28,10 +28,10 @@
 #             break
 #         df = pd.DataFrame(data, columns=list(parquet_schema.names))
 #         df = df.astype(schema)
-        
+
 #         table = pa.Table.from_pandas(df)
 #         total_rows += table.num_rows
-        
+
 #         writer.write_table(table)
 
 # logging.info('Full parquet file named "%s" has been written to disk \
