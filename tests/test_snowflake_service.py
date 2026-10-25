@@ -1,6 +1,16 @@
 import pytest
 
-from snowflake_service import sql
+from snowflake_service import MissingCredentialsError, credentials_from_env, sql
+
+CREDENTIAL_ENV_VARS = [
+    "SNOWFLAKE_USER",
+    "SNOWFLAKE_PASSWORD",
+    "SNOWFLAKE_ACCOUNT",
+    "SNOWFLAKE_DATABASE",
+    "SNOWFLAKE_SCHEMA",
+    "SNOWFLAKE_WAREHOUSE",
+    "SNOWFLAKE_ROLE",
+]
 
 
 @pytest.mark.parametrize(
@@ -44,3 +54,28 @@ def test_sql_without_interpolations() -> None:
 def test_sql_rejects_non_identifiers(value: object) -> None:
     with pytest.raises(ValueError, match="not a valid Snowflake identifier"):
         sql(t"SELECT * FROM {value}")
+
+
+def test_credentials_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in CREDENTIAL_ENV_VARS:
+        monkeypatch.setenv(name, name.lower())
+
+    credentials = credentials_from_env()
+
+    assert credentials["user"] == "snowflake_user"
+    assert credentials["password"] == "snowflake_password"
+    assert credentials["role"] == "snowflake_role"
+
+
+def test_credentials_from_env_lists_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in CREDENTIAL_ENV_VARS:
+        monkeypatch.setenv(name, name.lower())
+    monkeypatch.delenv("SNOWFLAKE_PASSWORD")
+    monkeypatch.setenv("SNOWFLAKE_ROLE", "")  # empty counts as missing
+
+    with pytest.raises(MissingCredentialsError) as excinfo:
+        credentials_from_env()
+
+    assert str(excinfo.value) == (
+        "missing environment variables: SNOWFLAKE_PASSWORD, SNOWFLAKE_ROLE"
+    )
