@@ -1,3 +1,4 @@
+import os
 import re
 from string.templatelib import Interpolation, Template
 from types import TracebackType
@@ -22,6 +23,36 @@ class SnowflakeCredentials(TypedDict):
     schema: ReadOnly[str]
     warehouse: ReadOnly[str]
     role: ReadOnly[str]
+
+
+class MissingCredentialsError(RuntimeError):
+    pass
+
+
+def credentials_from_env() -> SnowflakeCredentials:
+    """reads Snowflake credentials from SNOWFLAKE_* environment variables"""
+    missing: list[str] = []
+
+    def require(name: str) -> str:
+        value = os.getenv(name, "")
+        if not value:
+            missing.append(name)
+        return value
+
+    credentials: SnowflakeCredentials = {
+        "user": require("SNOWFLAKE_USER"),
+        "password": require("SNOWFLAKE_PASSWORD"),
+        "account": require("SNOWFLAKE_ACCOUNT"),
+        "database": require("SNOWFLAKE_DATABASE"),
+        "schema": require("SNOWFLAKE_SCHEMA"),
+        "warehouse": require("SNOWFLAKE_WAREHOUSE"),
+        "role": require("SNOWFLAKE_ROLE"),
+    }
+    if missing:
+        raise MissingCredentialsError(
+            f"missing environment variables: {', '.join(missing)}"
+        )
+    return credentials
 
 
 def sql(query: Template) -> str:
