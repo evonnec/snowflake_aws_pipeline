@@ -3,7 +3,7 @@
 name = "snowflake-data-transfer-to-aws-app"
 dependencies = [
     "asn1crypto==1.5.1",
-    "certifi==2024.7.4",
+    "certifi==2026.10.19",
     "cffi==2.0.0",
     "charset-normalizer==2.1.1",
     "cryptography==46.0.5",
