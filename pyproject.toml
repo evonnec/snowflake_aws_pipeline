@@ -18,7 +18,7 @@ dependencies = [
     "pycparser==2.21",
     "pycryptodomex==3.19.1",
     "PyJWT==2.15.0",
-    "pyOpenSSL==25.3.0",
+    "pyOpenSSL==26.0.0",
     "python-dateutil==2.8.2",
     "pytz==2023.3",
     "requests==2.32.4",
