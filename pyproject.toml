@@ -27,6 +27,7 @@ dev = [
 [tool.uv]
 # floors from previous security bumps; applied only if something depends on them
 constraint-dependencies = [
+    "certifi>=2026.10.19",
     "cryptography>=50.0.0",
     "pyOpenSSL>=26.4.0",
     "requests>=2.33.0",
