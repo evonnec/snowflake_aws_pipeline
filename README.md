@@ -1,136 +1,102 @@
-## Background
+# Snowflake to S3 transfer
 
-This data company helps its customers distribute their data to external stakeholders. Prior to doing so, it is important to be able to clean and aggregate the data being transferred. We want to build some tooling to allow customers to transfer data between their system and their stakeholders’ systems.
+A command-line pipeline that reads a table from Snowflake, adds a monthly total for one numeric column, and uploads the result to an S3 bucket as JSON. It is built for handing a customer's data to an external stakeholder in an aggregated, cleaned form.
 
-## Goals
+## What it does
 
-Your goal is to write a program that transfers data between a Snowflake database owned by the customer and an S3 bucket owned by their stakeholder. When transferring the data, please apply the following transformations to the source data:
+For a given table, a date column and a numeric column, the pipeline:
 
-- Remove any fully blank rows
-- The customer wants to consume data at a monthly level of aggregation, so you should send an aggregated dataset using the existing columns. For all non-numeric columns, leave unaggregated, for numeric columns, use SUM aggregation.
-
-### Outputs
-
-To make this easier to use in an API endpoint, you should have a main function `transfer_data(source_table, destination_s3_bucket)` that takes the source Snowflake table and the destination S3 bucket and returns a results JSON in the following format:
+1. Reads the whole table from Snowflake into a pandas DataFrame.
+2. Asks Snowflake for `SUM(<sum column>)` grouped by the month and year of the date column.
+3. Joins that monthly total onto every row of its month, as a new `SUM(<sum column>)` column. All original columns are kept unaggregated.
+4. Drops fully blank rows.
+5. Serializes the result to JSON records in memory and uploads it to S3 as `<TABLE>_<uuid>_<YYYYmmdd-HHMMSS>.json`.
+6. Returns, and logs, a result summary:
 
 ```json
 {
-  "file_name": str,
-  "row_count": int,
-  "timestamp": str
+  "file_name": "ORDERS_100K_0193f3c2…_20230629-150002.json",
+  "row_count": 8911,
+  "timestamp": "20230629-150002"
 }
 ```
 
-#### Example output
+### Example output
 
-`snowflake_data_81ad294cbb7842a491dec9670a6bd192_20230629-150002.json` is an example of the JSON the pipeline uploads to S3, for `--table_name ORDERS_100K --group_column O_ORDERDATE --sum_column O_TOTALPRICE`. It has one record per source row (8,911 rows, January–August 1998), each carrying its month's total in `SUM(O_TOTALPRICE)`. Timestamps (`O_ORDERDATE`, `CREATED_AT`) are epoch milliseconds, pandas' default for `to_json`.
+`snowflake_data_81ad294cbb7842a491dec9670a6bd192_20230629-150002.json` is a real upload from a run with `--table_name ORDERS_100K --group_column O_ORDERDATE --sum_column O_TOTALPRICE`. An earlier version named uploads `snowflake_data_…`, and the current code uses the table name. It has one record per source row (8,911 rows, January–August 1998), each carrying its month's total in `SUM(O_TOTALPRICE)`. Timestamps (`O_ORDERDATE`, `CREATED_AT`) are epoch milliseconds, the pandas default for `to_json`.
 
-### Inputs
+## Setup
 
-The Snowflake database credentials are contained in `main.py`, along with some starter code for pulling data from Snowflake.  There are 3 sample tables available on the PUBLIC database:
+1. Install [uv](https://docs.astral.sh/uv/) (for example `brew install uv`). The project targets Python 3.14, pinned in `.python-version`, and uv downloads it if needed.
+2. Run `uv sync` to create `.venv` from the locked dependencies in `uv.lock`, including the dev tools.
+3. Copy `.env.example` to `.env` and fill in the Snowflake (`SNOWFLAKE_*`) and AWS values. `.env` is gitignored, so it never gets committed.
 
-- LOCATIONS_595
-- ORDERS_100K
-- MOVIE_RATINGS_27M
+All credentials come from environment variables, and none live in the code. The Snowflake user needs read access to the source table, and the AWS keys need `s3:PutObject` on the destination bucket.
 
-Snowflake and AWS credentials are read from environment variables (see Setup); nothing secret lives in the code.
+## Usage
 
-### Setup
+```sh
+uv run --env-file .env main.py --table_name ORDERS_100K --group_column O_ORDERDATE --sum_column O_TOTALPRICE
+```
 
-To get started, follow these steps:
+| Option | Required | Description |
+| --- | --- | --- |
+| `--group_column` | yes | Date or timestamp column whose month and year define the groups |
+| `--sum_column` | yes | Numeric column to total per month |
+| `--table_name` | no | Source table, optionally qualified as `database.schema.table` (default `LOCATIONS_595`) |
+| `--bucket_name` | no | Destination S3 bucket (default: `AWS_STORAGE_BUCKET_NAME`) |
 
-1. Clone this git repo to a folder on your local computer and navigate to it
-2. Install [uv](https://docs.astral.sh/uv/) (e.g. `brew install uv`). The project targets Python 3.14 (pinned in `.python-version`); uv downloads it if needed.  
-3. Run `uv sync` to create `.venv` with the locked dependencies (`uv.lock`) and dev tools.  
-4. Copy `.env.example` to `.env` and fill in the Snowflake (`SNOWFLAKE_*`) and AWS values. `.env` is gitignored, so never commit it.  
-5. Run the pipeline with `uv run --env-file .env main.py --table_name ... --group_column ... --sum_column ...`. Variables exported in your shell work too; `--env-file` is just a convenience.  
+Variables exported in your shell work as well. `--env-file` is just a convenience.
 
-### Development
+### Sample tables
 
-`uv sync` installs everything in the `dev` dependency group. These are the same checks CI runs (`.github/workflows/ci.yml`) on every pull request and push to `main`:
+The `PUBLIC` schema used during development has three tables. Their columns and a few example rows are in `sample_schemas.txt`.
+
+| Table | `--group_column` | `--sum_column` |
+| --- | --- | --- |
+| `LOCATIONS_595` | `DOB` | `AREA_KM2` |
+| `ORDERS_100K` | `O_ORDERDATE` | `O_TOTALPRICE` |
+| `MOVIE_RATINGS_27M` | `TIMESTAMP` | `RATING` |
+
+## How it works
+
+| File | Role |
+| --- | --- |
+| `main.py` | CLI (`argparse`), the read-and-aggregate step (`snowflake_df_read_and_filter`), JSON serialization, and the S3 upload (`transfer_data`), which returns the result summary |
+| `snowflake_service.py` | Reads credentials from the environment, manages the Snowflake connection, and renders queries safely |
+| `tests/` | pytest suite, with a fake Snowflake service and [moto](https://github.com/getmoto/moto) for S3 |
+| `write_to_parquet.py` | A commented-out sketch of batched Parquet writing with pyarrow. It is not used by the pipeline. |
+
+Design choices:
+
+- **Columns are chosen explicitly.** The tables have several numeric and date columns. For example, `ORDERS_100K` has float key columns (`O_ORDERKEY`, `O_CUSTKEY`, `O_SHIPPRIORITY`) and two timestamps (`O_ORDERDATE`, `CREATED_AT`). Summing an order key is meaningless, so the caller names the date and sum columns rather than having the pipeline guess from the schema.
+- **Queries are written as t-strings (Python 3.14 template strings).** Table and column names can't be bound as SQL parameters, so `snowflake_service.sql()` accepts only values that are plain Snowflake identifiers, and rejects anything else before it reaches the query. That blocks SQL injection through the command-line options.
+- **The upload goes from memory.** The DataFrame is serialized to JSON bytes and sent with `put_object`, with no temporary file on disk. Records orientation keeps the output easy to read with `jq` or `json_pp`.
+- **Credentials come from the environment,** and the pipeline exits with a clear error naming any missing variables.
+
+## Development
+
+These are the same checks CI runs (`.github/workflows/ci.yml`) on every pull request and push to `main`:
 
 | Stage | Command |
 | --- | --- |
 | Test | `uv run pytest` |
 | Lint | `uv run ruff check .` |
-| Type check | `uv run mypy` |
+| Type check | `uv run mypy` (strict mode) |
 | Format | `uv run ruff format --check .` (drop `--check` to apply) |
 
-Tests use a fake Snowflake service and [moto](https://github.com/getmoto/moto) for S3, so they need no credentials or network access.
+The tests need no credentials or network access. Renovate keeps dependencies and GitHub Actions up to date.
 
-### Assumptions
+## Limitations and next steps
 
-You can assume the credentials will provide the appropriate access (please reach out if you have any issues).
+- **Two reads per run.** The table is read once in full and once for the monthly totals. The aggregation could happen in a single query, using a window function, or in pandas from the one read.
+- **Everything is held in memory.** The full table, the result and the JSON bytes all sit in RAM, which suits tables that fit comfortably in memory, and the original target server had 1 GB. For larger data:
+  - **Beyond memory (more than about 1 GB):** read in batches, or one month at a time, and write each batch to Parquet partitioned by year and month (`write_to_parquet.py` sketches the batched writer). Compute the totals per partition, and upload the files to S3 with multipart uploads.
+  - **Terabyte scale:** let Snowflake do the work, with `COPY INTO @stage` to unload the aggregated result straight to S3 as partitioned Parquet, or move the transform to Spark.
+- **JSON is the only output format.** Parquet would be smaller and typed. The format could become an option, with the S3 content type set to match.
+- **The `SUM(...)` column is added alongside the original sum column.** Whether stakeholders want the per-row value, the monthly total, or both is still an open question (there's a `TODO` in `main.py`).
+- **Upload failures are only logged.** `transfer_data` logs a non-200 response from S3, but still returns a result, and `snowflake_df_read_and_filter` prints the joined DataFrame to stdout. Both should be tightened before production use.
 
-Our processing server has 1GB RAM.
+## License
 
-## Deliverables
-
-1. Runnable program written in Python
-    1. Feel free to use any external libraries needed to accomplish the task
-        - type checking with mypy (strict mode, files configured in `pyproject.toml`):  
-        ```uv run mypy``` should return `Success: no issues found in source files`  
-        - linting with ruff:  
-        ```uv run ruff check .```
-        - formatting with ruff (replaces black):  
-        ```uv run ruff format .``` 
-2. Explain how to run your program   
-    2. For each of the tables, we ought to pass in the date column in which to group by month, and the column to sum.  
-    We could potentially have pulled out the schemas of the tables for datetime col's and int/float/etc col's in order to do the group by and sum, but some tables had more than one col.  
-    For example, `ORDERS_100K` had `O_ORDERKEY` and `O_CUSTOMERKEY` and `O_SHIPPRIORITY` as float types in addition to `O_TOTALPRICE`. Additionally, there were two timestamps with `CREATED_AT` and `O_ORDERDATE` to group by month.
-    Specifying explicitly, we group by a specific column instead of guessing which column we want to do the grouping by. Since it doesn't really make sense to sum by order key or customer key or shipping priority, we decide what column we want to sum by monthly aggregation which is total price.
-    Perhaps we do want to handle multiple sums given a specific group column. In which case, we can take inventory of all the float columns by checking the schemas and returning the columns whose type can be summed by month and then rearchitect. 
-    For simplicity, we specify the exact columns in this example code.  
-  ```uv run --env-file .env main.py --table_name 'LOCATIONS_595' --sum_column 'AREA_KM2' --group_column 'DOB'```  
-  ```uv run --env-file .env main.py --table_name 'ORDERS_100K' --sum_column 'O_TOTALPRICE' --group_column 'O_ORDERDATE'```  
-  ```uv run --env-file .env main.py --table_name 'MOVIE_RATINGS_27M' --sum_column 'RATING' --group_column 'TIMESTAMP'```  
-    Format Options:  
-    - we can choose to stream io bytes or write to a file format  
-    - file formats that would work are .parquet or .json  
-    - we chose .json for now, and specify the `orient` parameter to give an orientation to determine how we'd like to see the output.  
-    for now, we've used `records` so we can pretty print the results
-    for example, to view use `cat LOCATIONS_595_<uuid>_<timestamp>.json | json_pp`
-    - additionally we choose bytes to pass to s3. At this time, we don't know if it is slower because we are reading in bytes.
-    Alternatively we could do a `with open(file):` and `s3.put_object` while the file is open as the documentation says that is acceptable as well:
-    https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3/client/put_object.html
-3. Any other comments you would like to include  
-    - we pull from the database twice to do the transform. ideally this would be one pull per time the program runs. and give it the filter before it returns all the results.  
-    - pull the secrets using secrets manager or similar, not have them in the code.  
-    - abstraction of more of the hard-coded elements
-    - unfortunately there are no tests or exception handling for the moment  
-    - notes in code to see  
-4. Live review meeting to discuss the below questions
-
-### Review Meeting
-
-We'll discuss the following questions (plus any other relevant follow-ups):
-
-1. Provide a brief explanation of your architecture and any external libraries used. Would you architect it differently if you had more time?
-    - brief architecture is that the program takes in a table, and a group by column (i.e. datetime) and a sum column (i.e. some numeric field) and sums the numeric field grouped by the month and year.
-    - it transforms it as required (no fully null rows), working with pandas dataframes.
-    - It then writes that to JSON in memory.
-    - holding in memory can be expensive as is writing to disk. we can make additional considerations if the data is too much for the resources it has and take a look at numpy or Spark or something else.
-    - It then uses boto3 python library to upload to S3.
-    - If I had more time, I'd probably clean it up more, further modularize the code, add tests for each item, and handle exceptions clearly. I would separate the CLI logic from the business logic.
-2. If you had to handle file sizes larger than 1GB, how would you change your program (if at all)? Larger than 1TB?
-    - For larger than 1 TB, we can't hold the entire dataset in memory. To work around that, we may want to pull data by month and year, then we could and write them to parquet. 
-    If that was unavailable to us, to pull all data by a set size and paginate, and from that large subset, put the rows into partitioned data objects by month/year, probably something like parquet, and do so again for a next batch and append to existing parquets. Once we have all the monthly data processed and properly partitioned, then do the sum/aggregate by month. And lastly, ship the results to S3, this may also have to be done in chunks. So the pipeline would have to be broken up partitions.
-3. How would you test that your program is working?
-    - I would write tests in a test suite using pytest, then have CI run those tests each time code is pushed.
-    - I would also perhaps set up mocking or stubbing to have a fake version of Snowflake and S3 for unit tests. Moto exists as a mock for AWS.
-    - For integration tests, I would have instances of those services which are not customer facing.
-    - I would do manual tests (running the CLI) as well or put those into a program, test those regularly or before releases.
-    - I would add strict linting and code coverage requirements.
-4. If you had more time, what other features would you include?
-    - the items I wrote above
-5. What was the most difficult part of this problem? If you were running this assessment, what would you change?
-    - getting used to libraries I haven't worked with that much. If I were running this assessment, I'd perhaps make the transform more clear as to exact expected output with a sample input example so it's clear what's expected. I would also maybe ask for different data type outputs to be handled and provide them based on what a client expects. also provide any specifics with respect to filename based on client needs.
-
-## Evaluation
-
-You will be evaluated based on the following criteria:
-
-1. Correctness – Does the program correctly apply the transformations and transfer the data? 
-2. Clarity – Is your code well-organized and easy to read? 
-3. Extensibility – Is your solution architected in a manner that makes it easy to collaborate with multiple engineers, and allow them to add and modify features in a consistent, testable way?
-4. Communication - Were you able to explain your answers in the review meeting? Did you ask clarifying questions if needed?
+GPL-3.0, see `LICENSE`.
